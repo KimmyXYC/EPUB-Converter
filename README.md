@@ -16,6 +16,19 @@
 ### 前置要求
 
 - Python 3.7 或更高版本
+- tkinter (Python的GUI库，通常随Python一起安装)
+
+**注意**: 在Linux系统上，如果tkinter未安装，可以通过以下命令安装：
+```bash
+# Ubuntu/Debian
+sudo apt-get install python3-tk
+
+# Fedora
+sudo dnf install python3-tkinter
+
+# Arch Linux
+sudo pacman -S tk
+```
 
 ### 安装依赖
 
@@ -25,7 +38,7 @@ pip install -r requirements.txt
 
 ## 使用方法
 
-### 图形界面模式（推荐）
+### 方法1: 图形界面模式（推荐，需要显示器）
 
 1. 运行主程序：
 
@@ -45,9 +58,31 @@ python gui.py
    - 点击"开始处理"按钮开始修复
    - 等待处理完成，查看结果
 
-### 命令行模式
+### 方法2: 命令行界面（适用于无图形界面环境）
 
-如果需要在命令行中使用，可以编写脚本调用`epub_fixer.py`模块：
+```bash
+# 查看帮助
+python cli.py --help
+
+# 修复单个文件（保存到新文件）
+python cli.py input.epub -o output.epub
+
+# 修复单个文件（覆盖原文件）
+python cli.py input.epub --overwrite
+
+# 批量修复（保存到指定目录）
+python cli.py file1.epub file2.epub file3.epub -d ./fixed/
+
+# 批量修复（覆盖原文件）
+python cli.py *.epub --overwrite
+
+# 显示详细处理信息
+python cli.py input.epub -o output.epub -v
+```
+
+### 方法3: Python脚本调用
+
+如果需要在Python脚本中使用，可以直接调用`epub_fixer.py`模块：
 
 ```python
 from epub_fixer import EPUBFixer
@@ -83,12 +118,16 @@ fixer.batch_fix(['file1.epub', 'file2.epub'], output_dir='./fixed/')
 
 ```
 EPUB-Converter/
-├── main.py           # 主入口文件
-├── gui.py            # GUI界面
-├── epub_fixer.py     # 核心修复逻辑
-├── requirements.txt  # Python依赖
-├── README.md         # 说明文档
-└── LICENSE          # MIT许可证
+├── main.py              # 主入口文件（GUI）
+├── gui.py               # GUI图形界面
+├── cli.py               # 命令行界面
+├── epub_fixer.py        # 核心修复逻辑
+├── requirements.txt     # Python依赖
+├── README.md            # 说明文档
+├── LICENSE              # MIT许可证
+├── test_epub_fixer.py   # 单元测试
+├── test_integration.py  # 集成测试
+└── create_test_epub.py  # 测试EPUB生成器
 ```
 
 ## 技术栈

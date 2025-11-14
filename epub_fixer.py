@@ -78,8 +78,6 @@ class EPUBFixer:
             
         except Exception as e:
             print(f"修复文件 {input_path} 时出错: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return False
     
     def _fix_html_content(self, content: bytes) -> bytes:
