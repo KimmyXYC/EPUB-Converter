@@ -33,7 +33,7 @@ class EPUBFixerGUI:
         title_label = ttk.Label(
             self.root,
             text="EPUB格式修复工具",
-            font=("Arial", 16, "bold")
+            font=("Misans", 16, "bold")
         )
         self.title_label = title_label
         
@@ -41,7 +41,7 @@ class EPUBFixerGUI:
         desc_label = ttk.Label(
             self.root,
             text="修复机翻后的EPUB文件中的文字排版方向和字体问题",
-            font=("Arial", 10)
+            font=("Misans", 10)
         )
         self.desc_label = desc_label
         
