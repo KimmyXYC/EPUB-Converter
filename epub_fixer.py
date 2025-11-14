@@ -381,6 +381,12 @@ img {
     max-width: 100%;
     height: auto;
 }
+
+/* 确保SVG图片自动缩放以适应屏幕宽度 */
+svg {
+    max-width: 100%;
+    height: auto;
+}
 """
     
     def batch_fix(self, input_paths: List[str], output_dir: Optional[str] = None) -> dict:

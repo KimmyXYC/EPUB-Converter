@@ -178,6 +178,59 @@ def test_image_preservation():
     print("✓ 图片样式保留测试通过")
 
 
+def test_svg_image_scaling():
+    """测试SVG图片缩放规则"""
+    from bs4 import BeautifulSoup
+    
+    fixer = EPUBFixer()
+    
+    # 测试修复后的CSS包含SVG缩放规则
+    css = fixer._get_fix_css()
+    assert "svg" in css
+    assert "svg" in css and "max-width: 100%" in css
+    assert "svg" in css and "height: auto" in css
+    print("✓ 修复CSS包含SVG缩放规则测试通过")
+    
+    # 测试包含SVG图片的HTML处理
+    html_with_svg = '''<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja" class="calibre">
+<head>
+    <title>Test with SVG</title>
+    <meta name="viewport" content="width=1090, height=2048"/>
+</head>
+<body class="calibre1">
+<div class="main">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="100%" height="100%" viewBox="0 0 1090 2048">
+<image width="1090" height="2048" xlink:href="../images/00004.jpeg"/>
+</svg>
+</div>
+</body>
+</html>'''
+    
+    fixed_html = fixer._fix_html_content(html_with_svg.encode('utf-8')).decode('utf-8')
+    soup = BeautifulSoup(fixed_html, 'html.parser')
+    
+    # 检查SVG元素是否保留
+    svg = soup.find('svg')
+    assert svg is not None, "SVG element should be preserved"
+    
+    # 检查SVG内的image元素是否保留
+    image = soup.find('image')
+    assert image is not None, "SVG image element should be preserved"
+    assert image.get('width') == '1090', "Image width attribute should be preserved"
+    assert image.get('height') == '2048', "Image height attribute should be preserved"
+    
+    # 检查是否添加了包含SVG样式的修复样式
+    style_tag = soup.find('style', {'id': 'epub-fixer-style'})
+    assert style_tag is not None, "Fixer style should be added"
+    assert "svg" in style_tag.string, "SVG scaling rules should be in fixer style"
+    
+    print("✓ SVG图片元素保留测试通过")
+    print("✓ SVG图片缩放样式测试通过")
+
+
 if __name__ == "__main__":
     print("开始测试EPUB修复功能...")
     print()
@@ -190,6 +243,7 @@ if __name__ == "__main__":
         test_progress_tracking()
         test_page_progression_direction()
         test_image_preservation()
+        test_svg_image_scaling()
         
         print()
         print("=" * 50)
