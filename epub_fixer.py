@@ -139,7 +139,6 @@ class EPUBFixer:
             bytes: 修复后的HTML内容
         """
         try:
-            # 使用html.parser来处理XHTML，保持更好的兼容性
             # 使用XML解析器以更好地保留XHTML结构，避免无意更改标签属性（如img尺寸）
             soup = BeautifulSoup(content, 'xml')
             
@@ -249,7 +248,6 @@ class EPUBFixer:
                 
                 # 替换竖排为横排
                 if 'writing-mode' in line_lower and ('vertical-rl' in line_lower or 'vertical-lr' in line_lower or 'tb-rl' in line_lower or 'tb-lr' in line_lower):
-                    # 替换为横排（仅替换明确的竖排取值）
                     fixed_lines.append(line.replace('vertical-rl', 'horizontal-tb')
                                           .replace('vertical-lr', 'horizontal-tb')
                                           .replace('tb-rl', 'horizontal-tb')
