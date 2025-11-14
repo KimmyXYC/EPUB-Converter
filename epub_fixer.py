@@ -140,7 +140,8 @@ class EPUBFixer:
         """
         try:
             # 使用html.parser来处理XHTML，保持更好的兼容性
-            soup = BeautifulSoup(content, 'html.parser')
+            # 使用XML解析器以更好地保留XHTML结构，避免无意更改标签属性（如img尺寸）
+            soup = BeautifulSoup(content, 'xml')
             
             # 修复body标签的writing-mode
             body = soup.find('body')
@@ -153,6 +154,9 @@ class EPUBFixer:
             
             # 修复所有标签的style属性
             for tag in soup.find_all(style=True):
+                # 避免修改<img>的尺寸样式，保持原有显示
+                if getattr(tag, 'name', '').lower() == 'img':
+                    continue
                 style = tag.get('style', '')
                 fixed_style = self._fix_style_attribute(style)
                 tag['style'] = fixed_style
@@ -189,24 +193,27 @@ class EPUBFixer:
         fixed_rules = []
         
         for rule in style_rules:
-            # 移除或修复writing-mode
-            if 'writing-mode' in rule.lower():
-                # 将竖排改为横排
-                if 'vertical' in rule.lower() or 'tb' in rule.lower():
+            rl = rule.lower()
+            # 仅当明确为竖排取值时才修复writing-mode，避免误伤
+            if 'writing-mode' in rl:
+                # 提取属性值进行判断
+                # 简单拆分，不做复杂CSS解析
+                if ':' in rl:
+                    prop, val = [s.strip() for s in rl.split(':', 1)]
+                else:
+                    prop, val = rl, ''
+                if any(v in val for v in ['vertical-rl', 'vertical-lr', 'tb-rl', 'tb-lr']):
                     fixed_rules.append('writing-mode: horizontal-tb')
                     continue
             
-            # 移除text-orientation
-            if 'text-orientation' in rule.lower():
+            # 移除text-orientation（与竖排相关）
+            if 'text-orientation' in rl:
                 continue
             
-            # 移除-webkit-writing-mode
-            if '-webkit-writing-mode' in rule.lower():
-                continue
-                
-            # 移除-epub-writing-mode
-            if '-epub-writing-mode' in rule.lower():
-                continue
+            # 移除-webkit-writing-mode / -epub-writing-mode 的竖排设置
+            if '-webkit-writing-mode' in rl or '-epub-writing-mode' in rl:
+                if any(v in rl for v in ['vertical-rl', 'vertical-lr', 'tb-rl', 'tb-lr', 'vertical']):
+                    continue
             
             fixed_rules.append(rule)
         
@@ -233,8 +240,8 @@ class EPUBFixer:
                 line_lower = line.lower()
                 
                 # 替换竖排为横排
-                if 'writing-mode' in line_lower and ('vertical' in line_lower or 'tb-rl' in line_lower or 'tb' in line_lower):
-                    # 替换为横排
+                if 'writing-mode' in line_lower and ('vertical-rl' in line_lower or 'vertical-lr' in line_lower or 'tb-rl' in line_lower or 'tb-lr' in line_lower):
+                    # 替换为横排（仅替换明确的竖排取值）
                     fixed_lines.append(line.replace('vertical-rl', 'horizontal-tb')
                                           .replace('vertical-lr', 'horizontal-tb')
                                           .replace('tb-rl', 'horizontal-tb')
@@ -366,27 +373,11 @@ body {
     direction: ltr;
 }
 
-/* 仅对文本元素应用text-orientation，避免影响图片 */
-p, div, span, h1, h2, h3, h4, h5, h6 {
-    text-orientation: mixed !important;
-}
-
 /* 确保中文字体正确显示 */
 body, p, div, span {
     font-family: "Microsoft YaHei", "SimSun", "PingFang SC", "Noto Sans CJK SC", sans-serif;
 }
 
-/* 确保图片自动缩放以适应屏幕宽度 */
-img {
-    max-width: 100%;
-    height: auto;
-}
-
-/* 确保SVG图片自动缩放以适应屏幕宽度 */
-svg {
-    max-width: 100%;
-    height: auto;
-}
 """
     
     def batch_fix(self, input_paths: List[str], output_dir: Optional[str] = None) -> dict:
