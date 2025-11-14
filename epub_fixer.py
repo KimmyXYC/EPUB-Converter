@@ -43,15 +43,29 @@ class EPUBFixer:
             for item in book.get_items():
                 if item.get_type() == 9:  # ITEM_DOCUMENT
                     content = item.get_content()
-                    fixed_content = self._fix_html_content(content)
-                    item.set_content(fixed_content)
+                    if content:  # 确保内容不为空
+                        fixed_content = self._fix_html_content(content)
+                        item.set_content(fixed_content)
             
             # 修复CSS样式表
             for item in book.get_items():
-                if item.get_type() == 4:  # ITEM_STYLE
+                if item.get_type() == 2:  # ITEM_STYLE (CSS files)
                     content = item.get_content()
-                    fixed_content = self._fix_css_content(content)
-                    item.set_content(fixed_content)
+                    if content:  # 确保内容不为空
+                        fixed_content = self._fix_css_content(content)
+                        item.set_content(fixed_content)
+            
+            # 添加全局修复CSS文件
+            fix_css = epub.EpubItem(
+                uid="epub_fixer_style",
+                file_name="style/epub_fixer.css",
+                media_type="text/css",
+                content=self._get_fix_css().encode('utf-8')
+            )
+            book.add_item(fix_css)
+            
+            # 修复TOC中的UID问题
+            self._fix_toc_uids(book)
             
             # 保存修复后的EPUB
             if output_path is None:
@@ -64,6 +78,8 @@ class EPUBFixer:
             
         except Exception as e:
             print(f"修复文件 {input_path} 时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def _fix_html_content(self, content: bytes) -> bytes:
@@ -77,7 +93,8 @@ class EPUBFixer:
             bytes: 修复后的HTML内容
         """
         try:
-            soup = BeautifulSoup(content, 'lxml')
+            # 使用html.parser来处理XHTML，保持更好的兼容性
+            soup = BeautifulSoup(content, 'html.parser')
             
             # 修复body标签的writing-mode
             body = soup.find('body')
@@ -100,7 +117,8 @@ class EPUBFixer:
                 # 检查是否已经存在修复样式
                 existing_style = head.find('style', id='epub-fixer-style')
                 if not existing_style:
-                    style_tag = soup.new_tag('style', id='epub-fixer-style')
+                    style_tag = soup.new_tag('style')
+                    style_tag['id'] = 'epub-fixer-style'
                     style_tag.string = self._get_fix_css()
                     head.append(style_tag)
             
@@ -195,6 +213,36 @@ class EPUBFixer:
         except Exception as e:
             print(f"修复CSS内容时出错: {str(e)}")
             return content
+    
+    def _fix_toc_uids(self, book):
+        """
+        修复TOC中Link对象缺少UID的问题
+        
+        Args:
+            book: EPUB book对象
+        """
+        import uuid
+        
+        def fix_toc_item(item):
+            """递归修复TOC项"""
+            if isinstance(item, tuple):
+                # 处理嵌套的TOC结构
+                for sub_item in item:
+                    fix_toc_item(sub_item)
+            elif isinstance(item, list):
+                for sub_item in item:
+                    fix_toc_item(sub_item)
+            elif hasattr(item, 'uid'):
+                if item.uid is None:
+                    # 为Link对象生成UID
+                    item.uid = str(uuid.uuid4())
+        
+        if book.toc:
+            if isinstance(book.toc, (list, tuple)):
+                for item in book.toc:
+                    fix_toc_item(item)
+            else:
+                fix_toc_item(book.toc)
     
     def _get_fix_css(self) -> str:
         """
