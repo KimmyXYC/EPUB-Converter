@@ -36,51 +36,96 @@ class EPUBFixer:
         try:
             self.current_file = os.path.basename(input_path)
             
-            # 读取EPUB文件
-            book = epub.read_epub(input_path)
-            
-            # 修复所有HTML文档
-            for item in book.get_items():
-                if item.get_type() == 9:  # ITEM_DOCUMENT
-                    content = item.get_content()
-                    if content:  # 确保内容不为空
-                        fixed_content = self._fix_html_content(content)
-                        item.set_content(fixed_content)
-            
-            # 修复CSS样式表
-            for item in book.get_items():
-                if item.get_type() == 2:  # ITEM_STYLE (CSS files)
-                    content = item.get_content()
-                    if content:  # 确保内容不为空
-                        fixed_content = self._fix_css_content(content)
-                        item.set_content(fixed_content)
-            
-            # 添加全局修复CSS文件
-            fix_css = epub.EpubItem(
-                uid="epub_fixer_style",
-                file_name="style/epub_fixer.css",
-                media_type="text/css",
-                content=self._get_fix_css().encode('utf-8')
-            )
-            book.add_item(fix_css)
-            
-            # 修复TOC中的UID问题
-            self._fix_toc_uids(book)
-            
-            # 修复页面翻页方向（从右到左改为从左到右）
-            self._fix_page_progression_direction(book)
-            
-            # 保存修复后的EPUB
+            # 如果output_path为None，使用临时文件
             if output_path is None:
                 output_path = input_path
             
-            epub.write_epub(output_path, book)
-            self.processed_files += 1
+            # 创建临时目录来处理EPUB
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # 解压EPUB到临时目录
+                with zipfile.ZipFile(input_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+                
+                # 使用ebooklib读取EPUB结构（用于获取元数据和列表）
+                book = epub.read_epub(input_path)
+                
+                # 查找并修复所有HTML文件
+                for item in book.get_items():
+                    if item.get_type() == 9:  # ITEM_DOCUMENT
+                        # 找到文件在解压目录中的实际路径
+                        file_found = False
+                        for prefix in ['EPUB/', 'OEBPS/', '']:
+                            file_path = os.path.join(temp_dir, prefix, item.file_name)
+                            if os.path.exists(file_path):
+                                # 读取并修复HTML内容
+                                with open(file_path, 'r', encoding='utf-8') as f:
+                                    content = f.read().encode('utf-8')
+                                
+                                fixed_content = self._fix_html_content(content)
+                                
+                                # 写回修复后的内容
+                                with open(file_path, 'wb') as f:
+                                    f.write(fixed_content)
+                                
+                                file_found = True
+                                break
+                        
+                        if not file_found:
+                            print(f"警告: 未找到文件 {item.file_name}")
+                
+                # 修复CSS样式表
+                for item in book.get_items():
+                    if item.get_type() == 2:  # ITEM_STYLE
+                        file_found = False
+                        for prefix in ['EPUB/', 'OEBPS/', '']:
+                            file_path = os.path.join(temp_dir, prefix, item.file_name)
+                            if os.path.exists(file_path):
+                                with open(file_path, 'r', encoding='utf-8') as f:
+                                    content = f.read().encode('utf-8')
+                                
+                                fixed_content = self._fix_css_content(content)
+                                
+                                with open(file_path, 'wb') as f:
+                                    f.write(fixed_content)
+                                
+                                file_found = True
+                                break
+                
+                # 添加全局修复CSS文件
+                for prefix in ['EPUB/', 'OEBPS/', '']:
+                    style_dir = os.path.join(temp_dir, prefix, 'style')
+                    if os.path.exists(style_dir):
+                        fix_css_path = os.path.join(style_dir, 'epub_fixer.css')
+                        with open(fix_css_path, 'w', encoding='utf-8') as f:
+                            f.write(self._get_fix_css())
+                        break
+                
+                # 修复页面翻页方向（修改OPF文件）
+                self._fix_opf_direction(temp_dir)
+                
+                # 重新打包EPUB
+                with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zip_out:
+                    # 首先添加mimetype文件（必须不压缩且首先添加）
+                    mimetype_path = os.path.join(temp_dir, 'mimetype')
+                    if os.path.exists(mimetype_path):
+                        zip_out.write(mimetype_path, 'mimetype', compress_type=zipfile.ZIP_STORED)
+                    
+                    # 添加其他所有文件
+                    for root, dirs, files in os.walk(temp_dir):
+                        for file in files:
+                            if file == 'mimetype':
+                                continue
+                            file_path = os.path.join(root, file)
+                            arc_name = os.path.relpath(file_path, temp_dir)
+                            zip_out.write(file_path, arc_name)
             
+            self.processed_files += 1
             return True
             
         except Exception as e:
             print(f"修复文件 {input_path} 时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def _fix_html_content(self, content: bytes) -> bytes:
@@ -264,6 +309,47 @@ class EPUBFixer:
             # 如果没有direction属性，设置为LTR
             book.direction = 'ltr'
     
+    def _fix_opf_direction(self, epub_dir: str):
+        """
+        修复OPF文件中的页面翻页方向
+        
+        Args:
+            epub_dir: EPUB解压目录
+        """
+        import xml.etree.ElementTree as ET
+        
+        # 查找OPF文件
+        opf_path = None
+        for prefix in ['EPUB/', 'OEBPS/', '']:
+            for file in os.listdir(os.path.join(epub_dir, prefix)) if os.path.exists(os.path.join(epub_dir, prefix)) else []:
+                if file.endswith('.opf'):
+                    opf_path = os.path.join(epub_dir, prefix, file)
+                    break
+            if opf_path:
+                break
+        
+        if not opf_path:
+            return
+        
+        try:
+            # 解析OPF文件
+            tree = ET.parse(opf_path)
+            root = tree.getroot()
+            
+            # 查找spine元素
+            ns = {'opf': 'http://www.idpf.org/2007/opf'}
+            spine = root.find('.//opf:spine', ns)
+            
+            if spine is not None:
+                # 修改page-progression-direction属性
+                if spine.get('page-progression-direction') == 'rtl':
+                    spine.set('page-progression-direction', 'ltr')
+            
+            # 保存修改后的OPF文件
+            tree.write(opf_path, encoding='utf-8', xml_declaration=True)
+        except Exception as e:
+            print(f"修复OPF文件时出错: {str(e)}")
+    
     def _get_fix_css(self) -> str:
         """
         获取用于修复排版的CSS规则
@@ -280,13 +366,20 @@ body {
     direction: ltr;
 }
 
-* {
+/* 仅对文本元素应用text-orientation，避免影响图片 */
+p, div, span, h1, h2, h3, h4, h5, h6 {
     text-orientation: mixed !important;
 }
 
 /* 确保中文字体正确显示 */
 body, p, div, span {
     font-family: "Microsoft YaHei", "SimSun", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+}
+
+/* 确保图片自动缩放以适应屏幕宽度 */
+img {
+    max-width: 100%;
+    height: auto;
 }
 """
     

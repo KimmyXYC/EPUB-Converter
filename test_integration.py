@@ -56,53 +56,59 @@ def test_full_workflow():
     
     # 步骤4：验证修复后的文件
     print("步骤4: 验证修复后的文件...")
-    book_fixed = epub.read_epub(output_path)
+    
+    # 直接从ZIP文件读取以获取实际修复后的内容
+    import zipfile
     
     still_has_vertical = False
     has_horizontal = False
     has_fix_style = False
     
-    for item in book_fixed.get_items():
-        if item.get_type() == 9:  # HTML文档
-            content = item.get_content().decode('utf-8')
-            
-            # 检查是否还有竖排样式（在非注释中）
-            soup = BeautifulSoup(content, 'html.parser')
-            
-            # 检查body的style
-            body = soup.find('body')
-            if body and body.get('style'):
-                style = body.get('style', '')
-                if 'vertical' in style.lower() and 'horizontal' not in style.lower():
-                    still_has_vertical = True
-                    print(f"✗ {item.get_name()} 中仍有未修复的竖排样式")
-            
-            # 检查是否有横排样式
-            if 'horizontal-tb' in content:
-                has_horizontal = True
-            
-            # 检查是否注入了修复样式
-            if 'epub-fixer-style' in content:
-                has_fix_style = True
-    
-    # 检查CSS文件
-    for item in book_fixed.get_items():
-        if item.get_type() == 2:  # CSS样式表
-            content = item.get_content().decode('utf-8')
-            
-            # 检查是否有修复样式CSS文件
-            if 'epub_fixer' in item.get_name():
-                has_fix_style = True
-            
-            # 检查竖排样式是否被注释或修复
-            lines = content.split('\n')
-            for line in lines:
-                if 'writing-mode' in line.lower() and 'vertical' in line.lower():
-                    if not line.strip().startswith('/*'):
-                        # 检查是否已被替换为horizontal
-                        if 'horizontal' not in line.lower():
+    with zipfile.ZipFile(output_path, 'r') as zip_file:
+        # 检查HTML文件
+        for name in zip_file.namelist():
+            if name.endswith('.xhtml') or name.endswith('.html'):
+                with zip_file.open(name) as f:
+                    content = f.read().decode('utf-8')
+                    
+                    # 检查是否还有竖排样式（在非注释中）
+                    soup = BeautifulSoup(content, 'html.parser')
+                    
+                    # 检查body的style
+                    body = soup.find('body')
+                    if body and body.get('style'):
+                        style = body.get('style', '')
+                        if 'vertical' in style.lower() and 'horizontal' not in style.lower():
                             still_has_vertical = True
-                            print(f"✗ CSS文件 {item.get_name()} 中仍有未修复的竖排样式: {line.strip()}")
+                            print(f"✗ {name} 中仍有未修复的竖排样式")
+                    
+                    # 检查是否有横排样式
+                    if 'horizontal-tb' in content:
+                        has_horizontal = True
+                    
+                    # 检查是否注入了修复样式
+                    if 'epub-fixer-style' in content:
+                        has_fix_style = True
+        
+        # 检查CSS文件
+        for name in zip_file.namelist():
+            if name.endswith('.css'):
+                with zip_file.open(name) as f:
+                    content = f.read().decode('utf-8')
+                    
+                    # 检查是否有修复样式CSS文件
+                    if 'epub_fixer' in name:
+                        has_fix_style = True
+                    
+                    # 检查竖排样式是否被注释或修复
+                    lines = content.split('\n')
+                    for line in lines:
+                        if 'writing-mode' in line.lower() and 'vertical' in line.lower():
+                            if not line.strip().startswith('/*'):
+                                # 检查是否已被替换为horizontal
+                                if 'horizontal' not in line.lower():
+                                    still_has_vertical = True
+                                    print(f"✗ CSS文件 {name} 中仍有未修复的竖排样式: {line.strip()}")
     
     print()
     print("验证结果:")
