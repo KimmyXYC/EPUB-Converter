@@ -108,11 +108,16 @@ fixer.batch_fix(['file1.epub', 'file2.epub'], output_dir='./fixed/')
    - 移除或修复CSS中的writing-mode属性
    - 修复HTML中的style属性
 
-2. **字体问题修复**
+2. **页面翻页方向修复**
+   - 将右到左（RTL）的翻页方向改为左到右（LTR）
+   - 适配中文横排文本的阅读习惯
+   - 修复EPUB的page-progression-direction属性
+
+3. **字体问题修复**
    - 添加适合中文显示的字体族
    - 确保文字正确显示
 
-3. **样式优化**
+4. **样式优化**
    - 注入修复样式到每个HTML文档
    - 修复CSS样式表
    - 保持原有的其他样式不变

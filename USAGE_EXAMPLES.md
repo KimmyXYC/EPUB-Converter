@@ -226,13 +226,17 @@ done
 
 ### 修复前
 - 文字竖排显示（从上到下，从右到左）
+- 页面从右往左翻（RTL，日文阅读方式）
 - 可能使用了错误的字体
 - CSS包含 `writing-mode: vertical-rl` 等属性
+- EPUB包含 `page-progression-direction="rtl"` 属性
 
 ### 修复后
 - 文字横排显示（从左到右，从上到下）
+- 页面从左往右翻（LTR，中文阅读方式）
 - 使用中文友好的字体
 - CSS使用 `writing-mode: horizontal-tb`
+- EPUB使用 `page-progression-direction="ltr"`
 - 注入了修复样式确保正确显示
 
 ## 技术细节
@@ -247,6 +251,13 @@ done
 - `-webkit-writing-mode: vertical-*` (移除)
 - `-epub-writing-mode: vertical-*` (移除)
 - `text-orientation: upright` (移除)
+
+### 修复的EPUB属性
+
+工具会修复以下EPUB属性：
+
+- `page-progression-direction: rtl` → `ltr`
+- 未设置的page-progression-direction → 设置为 `ltr`
 
 ### 注入的修复样式
 
