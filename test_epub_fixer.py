@@ -130,6 +130,54 @@ def test_page_progression_direction():
     print("✓ 页面翻页方向修复测试通过")
 
 
+def test_image_preservation():
+    """测试图片样式和链接保留"""
+    import zipfile
+    from bs4 import BeautifulSoup
+    
+    # 测试修复后的CSS包含图片缩放规则
+    fixer = EPUBFixer()
+    css = fixer._get_fix_css()
+    
+    assert "img" in css
+    assert "max-width: 100%" in css
+    assert "height: auto" in css
+    print("✓ 修复CSS包含图片缩放规则测试通过")
+    
+    # 测试HTML处理保留head中的link标签
+    html_with_link = '''<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Test</title>
+    <link href="style/style.css" rel="stylesheet" type="text/css"/>
+</head>
+<body style="writing-mode: vertical-rl;">
+    <p>测试文本</p>
+    <img src="test.png" alt="图片"/>
+</body>
+</html>'''
+    
+    fixed_html = fixer._fix_html_content(html_with_link.encode('utf-8')).decode('utf-8')
+    soup = BeautifulSoup(fixed_html, 'html.parser')
+    
+    # 检查head部分是否存在
+    head = soup.find('head')
+    assert head is not None, "Head section should be preserved"
+    
+    # 检查link标签是否存在
+    link_tag = head.find('link', {'rel': 'stylesheet'})
+    assert link_tag is not None, "CSS link should be preserved"
+    assert link_tag.get('href') == 'style/style.css'
+    
+    # 检查是否添加了修复样式
+    style_tag = head.find('style', {'id': 'epub-fixer-style'})
+    assert style_tag is not None, "Fixer style should be added"
+    assert "img" in style_tag.string, "Image scaling rules should be in fixer style"
+    
+    print("✓ HTML处理保留CSS链接测试通过")
+    print("✓ 图片样式保留测试通过")
+
+
 if __name__ == "__main__":
     print("开始测试EPUB修复功能...")
     print()
@@ -141,6 +189,7 @@ if __name__ == "__main__":
         test_fix_css_generation()
         test_progress_tracking()
         test_page_progression_direction()
+        test_image_preservation()
         
         print()
         print("=" * 50)
