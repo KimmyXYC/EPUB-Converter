@@ -215,6 +215,14 @@ class EPUBFixer:
                 if any(v in rl for v in ['vertical-rl', 'vertical-lr', 'tb-rl', 'tb-lr', 'vertical']):
                     continue
             
+            # 修复text-decoration中包含overline的情况，改为underline（保留其他取值）
+            if 'text-decoration' in rl and 'overline' in rl:
+                if ':' in rule:
+                    prop_raw, val_raw = rule.split(':', 1)
+                    new_val = val_raw.replace('overline', 'underline')
+                    fixed_rules.append(f"{prop_raw.strip()}: {new_val.strip()}")
+                    continue
+            
             fixed_rules.append(rule)
         
         return '; '.join(fixed_rules)
@@ -258,6 +266,14 @@ class EPUBFixer:
                     if 'vertical' in line_lower:
                         fixed_lines.append('/* ' + line + ' */')
                         continue
+                
+                # 修复目录链接可能被设置为上划线的情况：将overline改为underline
+                if 'text-decoration' in line_lower and 'overline' in line_lower:
+                    fixed_lines.append(line.replace('overline', 'underline'))
+                    continue
+                if 'text-decoration-line' in line_lower and 'overline' in line_lower:
+                    fixed_lines.append(line.replace('overline', 'underline'))
+                    continue
                 
                 fixed_lines.append(line)
             
@@ -378,6 +394,26 @@ body, p, div, span {
     font-family: "Microsoft YaHei", "SimSun", "PingFang SC", "Noto Sans CJK SC", sans-serif;
 }
 
+/* 目录页链接统一使用下划线，避免出现上划线 */
+/* 常见目录页class: body.p-toc, .p-toc, .toc */
+body.p-toc a,
+.p-toc a,
+.toc a,
+body[class*="toc"] a {
+    text-decoration-line: underline !important;
+    text-decoration-thickness: auto;
+    text-underline-position: under !important;
+    text-decoration-skip-ink: auto;
+    border-top: none !important; /* 避免使用边框制造上划线 */
+}
+
+/* 如果有显式的overline声明，强制改为underline */
+a[style*="overline"],
+body.p-toc a[style],
+.p-toc a[style],
+.toc a[style] {
+    text-decoration-line: underline !important;
+}
 """
     
     def batch_fix(self, input_paths: List[str], output_dir: Optional[str] = None) -> dict:
