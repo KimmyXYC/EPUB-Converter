@@ -67,6 +67,9 @@ class EPUBFixer:
             # 修复TOC中的UID问题
             self._fix_toc_uids(book)
             
+            # 修复页面翻页方向（从右到左改为从左到右）
+            self._fix_page_progression_direction(book)
+            
             # 保存修复后的EPUB
             if output_path is None:
                 output_path = input_path
@@ -241,6 +244,25 @@ class EPUBFixer:
                     fix_toc_item(item)
             else:
                 fix_toc_item(book.toc)
+    
+    def _fix_page_progression_direction(self, book):
+        """
+        修复EPUB的页面翻页方向
+        将右到左（RTL）改为左到右（LTR），适用于横排中文文本
+        
+        Args:
+            book: EPUB book对象
+        """
+        # 检查并修复book.direction属性
+        # RTL (right-to-left) 用于日文等竖排文本
+        # LTR (left-to-right) 用于中文等横排文本
+        if hasattr(book, 'direction'):
+            if book.direction == 'rtl' or book.direction is None:
+                # 如果是RTL或未设置（None），改为LTR
+                book.direction = 'ltr'
+        else:
+            # 如果没有direction属性，设置为LTR
+            book.direction = 'ltr'
     
     def _get_fix_css(self) -> str:
         """

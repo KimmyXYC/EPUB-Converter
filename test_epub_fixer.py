@@ -98,6 +98,38 @@ def test_progress_tracking():
     print("✓ 进度跟踪测试通过")
 
 
+def test_page_progression_direction():
+    """测试页面翻页方向修复"""
+    from ebooklib import epub
+    
+    fixer = EPUBFixer()
+    
+    # 模拟一个book对象来测试方向修复
+    class MockBook:
+        def __init__(self, direction):
+            self.direction = direction
+    
+    # 测试RTL改为LTR
+    book_rtl = MockBook('rtl')
+    fixer._fix_page_progression_direction(book_rtl)
+    assert book_rtl.direction == 'ltr'
+    print("✓ RTL改为LTR测试通过")
+    
+    # 测试LTR保持LTR
+    book_ltr = MockBook('ltr')
+    fixer._fix_page_progression_direction(book_ltr)
+    assert book_ltr.direction == 'ltr'
+    print("✓ LTR保持不变测试通过")
+    
+    # 测试None改为LTR
+    book_none = MockBook(None)
+    fixer._fix_page_progression_direction(book_none)
+    assert book_none.direction == 'ltr'
+    print("✓ None改为LTR测试通过")
+    
+    print("✓ 页面翻页方向修复测试通过")
+
+
 if __name__ == "__main__":
     print("开始测试EPUB修复功能...")
     print()
@@ -108,6 +140,7 @@ if __name__ == "__main__":
         test_html_fixing()
         test_fix_css_generation()
         test_progress_tracking()
+        test_page_progression_direction()
         
         print()
         print("=" * 50)
